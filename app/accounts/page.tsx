@@ -346,7 +346,7 @@ export default function AccountsPage() {
           className="absolute inset-0 z-0 hidden opacity-70 [mask-image:radial-gradient(900px_circle_at_center,white,transparent)] md:block"
         />
 
-        <div className="relative z-10 flex min-h-screen items-center">
+        <div className="relative z-10 flex min-h-screen items-center pt-10 md:pt-0">
           <div className="mx-auto w-full max-w-[1480px] px-5 py-8 pb-24 sm:px-6 md:pb-8">
             <div className="mb-10 text-center">
               <h1 className="text-[30px] font-semibold tracking-tight text-zinc-100 sm:text-[38px] italic">

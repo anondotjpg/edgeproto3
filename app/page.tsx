@@ -111,8 +111,15 @@ function getOutcomeByName(
   return outcomes?.find((outcome) => outcome.name === teamName);
 }
 
-function getEventHref(game: Game) {
-  return `/event/${game.slug}`;
+function getOutcomeHref(game: Game, teamName: string) {
+  const params = new URLSearchParams({
+    gameId: game.id,
+    team: teamName,
+    league: game.sport_key,
+    market: "h2h",
+  });
+
+  return `/bet?${params.toString()}`;
 }
 
 function OddsCell({
@@ -195,7 +202,6 @@ function GameCard({ game }: { game: Game }) {
 
   const awayMoneyline = getOutcomeByName(h2h, game.away_team);
   const homeMoneyline = getOutcomeByName(h2h, game.home_team);
-  const eventHref = getEventHref(game);
 
   return (
     <article className="relative rounded-[24px] border border-zinc-800 bg-zinc-950 p-4 pb-12">
@@ -225,12 +231,12 @@ function GameCard({ game }: { game: Game }) {
         <div className="overflow-hidden rounded-2xl border border-zinc-800">
           <OddsCell
             value={formatPrice(awayMoneyline?.price)}
-            href={eventHref}
+            href={getOutcomeHref(game, game.away_team)}
             isTop
           />
           <OddsCell
             value={formatPrice(homeMoneyline?.price)}
-            href={eventHref}
+            href={getOutcomeHref(game, game.home_team)}
           />
         </div>
       </div>
@@ -240,7 +246,7 @@ function GameCard({ game }: { game: Game }) {
       </div>
 
       <Link
-        href={eventHref}
+        href={`/event/${game.slug}`}
         className="absolute bottom-4 right-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-zinc-400 transition-colors hover:text-white"
       >
         <span>View</span>
@@ -302,9 +308,9 @@ export default async function Home({
       <div className="min-h-screen bg-[#09090b] text-white">
         <div className="mx-auto w-full max-w-7xl px-4 py-5 pb-24 sm:px-6 sm:py-6 md:pb-6">
           <header>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <div className="min-w-0 flex-1">
-                <div className="no-scrollbar flex items-center gap-4 overflow-x-auto sm:gap-2">
+                <div className="no-scrollbar flex items-center gap-4 overflow-x-auto sm:gap-2 relative z-20">
                   {LEAGUES.map((item) => {
                     const isActive = item.league === selectedLeague;
 
@@ -315,7 +321,7 @@ export default async function Home({
                         className={
                           isActive
                             ? "shrink-0 text-[13px] font-semibold text-white sm:rounded-full sm:bg-white sm:px-4 sm:py-2 sm:text-black"
-                            : "shrink-0 text-[13px] font-medium text-zinc-500 sm:rounded-full sm:bg-zinc-900 sm:px-4 sm:py-2 sm:text-zinc-300"
+                            : "shrink-0 text-[13px] font-medium text-zinc-500 sm:rounded-full sm:px-4 sm:py-2 sm:text-zinc-300"
                         }
                       >
                         {item.label}
@@ -323,41 +329,6 @@ export default async function Home({
                     );
                   })}
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div
-                  className="inline-block rounded-full"
-                  style={{
-                    background: "#0369a1",
-                    paddingBottom: "2px",
-                    lineHeight: 0,
-                  }}
-                >
-                  <Link
-                    href="/accounts"
-                    className="relative inline-flex h-8 items-center overflow-hidden rounded-full bg-linear-to-br from-sky-300 via-sky-400 to-sky-500 px-4 text-[13px] font-bold text-sky-950 transition-transform duration-100 hover:translate-y-px active:translate-y-0"
-                    style={{
-                      transform: "translateY(-2px)",
-                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5)",
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-y-[-35%] left-[-22%] w-[18%] skew-x-[-20deg] bg-white/35 blur-md animate-[buttonShimmer_3.4s_ease-out_infinite]"
-                    />
-                    <span className="relative z-10">Start Challenge</span>
-                  </Link>
-                </div>
-
-                <Image
-                  src="/pfp.jpg"
-                  alt="Account"
-                  width={40}
-                  height={40}
-                  priority
-                  className="h-9 w-9 rounded-full border-[1px] border-zinc-800 object-cover"
-                />
               </div>
             </div>
           </header>

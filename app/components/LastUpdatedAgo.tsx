@@ -31,7 +31,7 @@ export default function LastUpdatedAgo({
 }: {
   updatedAt: string;
 }) {
-  const [label, setLabel] = useState(() => formatTimeAgo(updatedAt));
+  const [label, setLabel] = useState("0s ago");
 
   useEffect(() => {
     setLabel(formatTimeAgo(updatedAt));
@@ -59,6 +59,7 @@ export default function LastUpdatedAgo({
     <div
       className="w-[112px] shrink-0 text-left text-[13px] leading-tight text-zinc-500 tabular-nums"
       title={title}
+      suppressHydrationWarning
     >
       updated {label}
     </div>
