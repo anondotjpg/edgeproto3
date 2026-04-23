@@ -41,8 +41,8 @@ export default function AppSidebar() {
                   href={item.href}
                   className={
                     isActive
-                      ? "text-[30px] font-semibold leading-none tracking-tight text-zinc-100"
-                      : "text-[30px] font-semibold leading-none tracking-tight text-zinc-500 transition-colors hover:text-zinc-200"
+                      ? "rounded-md text-[30px] font-semibold leading-none tracking-tight text-zinc-100 outline-none focus:outline-none focus-visible:outline-none"
+                      : "rounded-md text-[30px] font-semibold leading-none tracking-tight text-zinc-500 outline-none transition-colors hover:text-zinc-200 focus:outline-none focus-visible:outline-none"
                   }
                 >
                   {item.label}
@@ -62,13 +62,13 @@ export default function AppSidebar() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="flex items-center justify-center px-2"
+                className="flex items-center justify-center px-2 outline-none focus:outline-none focus-visible:outline-none"
               >
                 <span
                   className={
                     isActive
-                      ? "text-[15px] font-semibold text-zinc-100"
-                      : "text-[15px] font-medium text-zinc-500"
+                      ? "rounded-md text-[15px] font-semibold text-zinc-100"
+                      : "rounded-md text-[15px] font-medium text-zinc-500"
                   }
                 >
                   {item.label}

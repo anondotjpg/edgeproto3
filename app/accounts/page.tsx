@@ -1,10 +1,13 @@
-import Link from "next/link";
 import * as React from "react";
+import ChallengeCta from "../components/ChallengeCta";
+import OwnedAccountsSection from "../components/OwnedAccountsSection";
+import type { PlanKey } from "@/lib/plans";
 
 type AccountPlan = {
-  size: string;
+  planKey: PlanKey;
+  sizeLabel: string;
   badge: string | null;
-  fee: string;
+  feeLabel: string;
   cta: string;
 };
 
@@ -68,27 +71,31 @@ function DotPattern({
 
 const ACCOUNT_PLANS: AccountPlan[] = [
   {
-    size: "$10,000",
+    planKey: "10000",
+    sizeLabel: "$10,000",
     badge: "33x Your Capital",
-    fee: "$299",
+    feeLabel: "$299",
     cta: "Start 10k Challenge",
   },
   {
-    size: "$5,000",
+    planKey: "5000",
+    sizeLabel: "$5,000",
     badge: "Heating Up",
-    fee: "$179",
+    feeLabel: "$179",
     cta: "Start 5k Challenge",
   },
   {
-    size: "$2,000",
+    planKey: "2000",
+    sizeLabel: "$2,000",
     badge: "Best for Beginners",
-    fee: "$89",
+    feeLabel: "$89",
     cta: "Start 2k Challenge",
   },
   {
-    size: "$1,000",
+    planKey: "1000",
+    sizeLabel: "$1,000",
     badge: null,
-    fee: "$49",
+    feeLabel: "$49",
     cta: "Start 1k Challenge",
   },
 ];
@@ -133,21 +140,15 @@ function DetailRow({
   );
 }
 
-function getButtonStyle(size: string): ButtonStyle {
-  if (size === "$10,000") return "gold";
-  if (size === "$5,000") return "silver";
+function getButtonStyle(sizeLabel: string): ButtonStyle {
+  if (sizeLabel === "$10,000") return "gold";
+  if (sizeLabel === "$5,000") return "silver";
   return "default";
 }
 
 function getCardBorderClassName(style: ButtonStyle) {
-  if (style === "gold") {
-    return "border-[#6b5520]";
-  }
-
-  if (style === "silver") {
-    return "border-zinc-500";
-  }
-
+  if (style === "gold") return "border-[#6b5520]";
+  if (style === "silver") return "border-zinc-500";
   return "border-zinc-800";
 }
 
@@ -175,40 +176,14 @@ function getBadgeClassName(style: ButtonStyle) {
   return "border-zinc-700 bg-zinc-900 text-zinc-200";
 }
 
-function getButtonShellClassName(style: ButtonStyle) {
-  if (style === "gold") {
-    return "bg-[#7b5a12]";
-  }
-
-  if (style === "silver") {
-    return "bg-zinc-500";
-  }
-
-  return "bg-zinc-800";
-}
-
-function getButtonFaceClassName(style: ButtonStyle) {
-  if (style === "gold") {
-    return "border border-[#6b5520] bg-linear-to-br from-[#e0b84b] via-[#cfa13a] to-[#b68b2d] text-[#120d02]";
-  }
-
-  if (style === "silver") {
-    return "border border-zinc-400 bg-linear-to-br from-zinc-100 via-zinc-300 to-zinc-400 text-zinc-900";
-  }
-
-  return "border border-zinc-800 bg-zinc-900 text-zinc-100";
-}
-
-function getShimmerClassName(style: ButtonStyle) {
-  if (style === "gold") {
-    return "pointer-events-none absolute inset-y-[-35%] left-[-22%] w-[18%] skew-x-[-20deg] bg-[#fff6d5]/35 blur-md animate-[buttonShimmer_3.4s_ease-out_infinite]";
-  }
-
-  return "pointer-events-none absolute inset-y-[-35%] left-[-22%] w-[18%] skew-x-[-20deg] bg-white/35 blur-md animate-[buttonShimmer_3.4s_ease-out_infinite]";
-}
-
-function AccountCard({ size, badge, fee, cta }: AccountPlan) {
-  const buttonStyle = getButtonStyle(size);
+function AccountCard({
+  planKey,
+  sizeLabel,
+  badge,
+  feeLabel,
+  cta,
+}: AccountPlan) {
+  const buttonStyle = getButtonStyle(sizeLabel);
   const shimmerEnabled = buttonStyle === "gold" || buttonStyle === "silver";
   const cardGlowEnabled = buttonStyle === "gold" || buttonStyle === "silver";
 
@@ -242,7 +217,7 @@ function AccountCard({ size, badge, fee, cta }: AccountPlan) {
 
         <div className="pt-1 text-center">
           <h2 className="text-[30px] font-semibold leading-none tracking-tight text-zinc-100">
-            {size}
+            {sizeLabel}
           </h2>
           <p className="mt-1.5 text-[15px] font-medium text-zinc-500">
             Funded Account
@@ -268,38 +243,16 @@ function AccountCard({ size, badge, fee, cta }: AccountPlan) {
           <div className="flex items-center justify-between gap-3">
             <div className="text-[16px] text-zinc-300">One Time Fee</div>
             <div className="text-right text-[22px] font-semibold text-zinc-100 sm:text-[26px]">
-              {fee}
+              {feeLabel}
             </div>
           </div>
 
-          <div
-            className={[
-              "mt-4 inline-block w-full rounded-[16px]",
-              getButtonShellClassName(buttonStyle),
-            ].join(" ")}
-            style={{ paddingBottom: "2px", lineHeight: 0 }}
-          >
-            <Link
-              href="/accounts"
-              className={[
-                "relative inline-flex h-11 w-full items-center justify-center overflow-hidden rounded-[16px] px-4 text-[15px] font-semibold transition-transform duration-100 hover:translate-y-px active:translate-y-0",
-                getButtonFaceClassName(buttonStyle),
-              ].join(" ")}
-              style={{
-                transform: "translateY(-2px)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
-              }}
-            >
-              {shimmerEnabled ? (
-                <span
-                  aria-hidden="true"
-                  className={getShimmerClassName(buttonStyle)}
-                />
-              ) : null}
-
-              <span className="relative z-10">{cta}</span>
-            </Link>
-          </div>
+          <ChallengeCta
+            cta={cta}
+            buttonStyle={buttonStyle}
+            shimmerEnabled={shimmerEnabled}
+            planKey={planKey}
+          />
 
           <p className="mt-3 text-center text-[7px] font-medium uppercase tracking-[0.18em] text-zinc-500">
             Pay with card or crypto. Instant activation after payment.
@@ -348,6 +301,8 @@ export default function AccountsPage() {
 
         <div className="relative z-10 flex min-h-screen items-center pt-10 md:pt-0">
           <div className="mx-auto w-full max-w-[1480px] px-5 py-8 pb-24 sm:px-6 md:pb-8">
+            <OwnedAccountsSection />
+
             <div className="mb-10 text-center">
               <h1 className="text-[30px] font-semibold tracking-tight text-zinc-100 sm:text-[38px] italic">
                 Find Your Edge
@@ -359,7 +314,10 @@ export default function AccountsPage() {
 
             <div className="grid justify-center gap-5 md:grid-cols-2 xl:grid-cols-4">
               {ACCOUNT_PLANS.map((plan) => (
-                <div key={plan.size} className="mx-auto w-full max-w-[340px]">
+                <div
+                  key={plan.planKey}
+                  className="mx-auto w-full max-w-[340px]"
+                >
                   <AccountCard {...plan} />
                 </div>
               ))}
