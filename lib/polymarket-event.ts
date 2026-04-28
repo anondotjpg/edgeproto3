@@ -56,10 +56,23 @@ export type EventOdds = {
   home_team_info?: TeamInfo;
   away_team_info?: TeamInfo;
   bookmakers: Bookmaker[];
+
+  polymarket: {
+    event_id: string;
+    event_slug: string | null;
+    market_id: string;
+    market_slug: string | null;
+    condition_id: string | null;
+    question: string | null;
+    outcomes: string[];
+    clob_token_ids: string[];
+  };
+
   outcome_token_ids?: {
     away?: string;
     home?: string;
   };
+
   debug?: GameDebug;
 };
 
@@ -67,6 +80,7 @@ type PolymarketMarket = {
   id: string | number;
   slug?: string;
   question?: string;
+  conditionId?: string;
   outcomes?: string | string[];
   outcomePrices?: string | string[];
   clobTokenIds?: string | string[];
@@ -470,6 +484,7 @@ async function buildGameFromMarket(
   const clobTokenIds = parseStringArray(market.clobTokenIds);
 
   if (outcomes.length !== 2 || prices.length !== 2) return null;
+  if (clobTokenIds.length !== outcomes.length) return null;
 
   const awayIndex = findOutcomeIndexForTeam(outcomes, teams.away);
   const homeIndex = findOutcomeIndexForTeam(outcomes, teams.home);
@@ -503,8 +518,12 @@ async function buildGameFromMarket(
     commence_time: commenceTime,
     home_team: outcomes[homeIndex],
     away_team: outcomes[awayIndex],
-    home_team_info: homeResolved.team ? makeTeamInfo(homeResolved.team) : undefined,
-    away_team_info: awayResolved.team ? makeTeamInfo(awayResolved.team) : undefined,
+    home_team_info: homeResolved.team
+      ? makeTeamInfo(homeResolved.team)
+      : undefined,
+    away_team_info: awayResolved.team
+      ? makeTeamInfo(awayResolved.team)
+      : undefined,
     bookmakers: [
       {
         key: "polymarket",
@@ -527,6 +546,16 @@ async function buildGameFromMarket(
         ],
       },
     ],
+    polymarket: {
+      event_id: String(event.id),
+      event_slug: event.slug || null,
+      market_id: String(market.id),
+      market_slug: market.slug || null,
+      condition_id: market.conditionId || null,
+      question: market.question || null,
+      outcomes,
+      clob_token_ids: clobTokenIds,
+    },
     outcome_token_ids: {
       away: clobTokenIds[awayIndex],
       home: clobTokenIds[homeIndex],

@@ -8,6 +8,8 @@ type AccountJoin = {
   plan_size: number;
 } | null;
 
+type BetStatus = "open" | "won" | "lost" | "void" | "cashed_out";
+
 type Bet = {
   id: string;
   account_id: string;
@@ -19,15 +21,21 @@ type Bet = {
   stake: number;
   potential_profit: number;
   potential_payout: number;
-  status: string;
-  result: string | null;
+  status: BetStatus;
+  result: BetStatus | null;
   settlement_amount: number | null;
   placed_at: string;
   settled_at: string | null;
   challenge_accounts: AccountJoin;
-};
 
-type SettleResult = "won" | "lost" | "void" | "cashed_out";
+  polymarket_condition_id?: string | null;
+  polymarket_token_id?: string | null;
+  polymarket_outcome?: string | null;
+  polymarket_synced_at?: string | null;
+  polymarket_winning_token_id?: string | null;
+  polymarket_winning_outcome?: string | null;
+  polymarket_resolution_error?: string | null;
+};
 
 function formatOdds(odds: number) {
   return odds > 0 ? `+${odds}` : `${odds}`;
@@ -42,7 +50,7 @@ function formatMoney(value: number | null | undefined) {
   })}`;
 }
 
-function formatDate(date: string | null) {
+function formatDate(date: string | null | undefined) {
   if (!date) return "—";
 
   return new Date(date).toLocaleString([], {
@@ -62,6 +70,7 @@ function getAccountLabel(bet: Bet) {
 }
 
 function resultLabel(status: string) {
+  if (status === "open") return "Open";
   if (status === "won") return "Won";
   if (status === "lost") return "Lost";
   if (status === "void") return "Void";
@@ -69,30 +78,32 @@ function resultLabel(status: string) {
   return status;
 }
 
+function getBetPnl(bet: Bet) {
+  if (bet.status === "won") return Number(bet.potential_profit);
+  if (bet.status === "lost") return -Number(bet.stake);
+  if (bet.status === "void") return 0;
+
+  if (bet.status === "cashed_out") {
+    return Number(bet.settlement_amount ?? 0) - Number(bet.stake);
+  }
+
+  return null;
+}
+
 function BetCard({
   bet,
   active,
-  onSettle,
-  isSettling,
+  onSyncPolymarket,
+  isSyncing,
 }: {
   bet: Bet;
   active?: boolean;
-  onSettle?: (betId: string, result: SettleResult, cashoutAmount?: number) => void;
-  isSettling?: boolean;
+  onSyncPolymarket?: (betId: string) => Promise<void>;
+  isSyncing?: boolean;
 }) {
-  const [cashoutOpen, setCashoutOpen] = useState(false);
-  const [cashoutAmount, setCashoutAmount] = useState("");
-
-  const pnl =
-    bet.status === "won"
-      ? Number(bet.potential_profit)
-      : bet.status === "lost"
-        ? -Number(bet.stake)
-        : bet.status === "void"
-          ? 0
-          : bet.status === "cashed_out"
-            ? Number(bet.settlement_amount ?? 0) - Number(bet.stake)
-            : null;
+  const pnl = getBetPnl(bet);
+  const displayStatus = bet.result ?? bet.status;
+  const hasPolymarketData = Boolean(bet.polymarket_condition_id);
 
   return (
     <div className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5">
@@ -112,7 +123,7 @@ function BetCard({
         </div>
 
         <div className="shrink-0 rounded-full border border-zinc-800 px-3 py-1 text-[12px] font-medium text-zinc-400">
-          {resultLabel(bet.status)}
+          {resultLabel(displayStatus)}
         </div>
       </div>
 
@@ -122,7 +133,7 @@ function BetCard({
             Odds
           </div>
           <div className="mt-1 text-sm font-semibold text-zinc-100">
-            {formatOdds(bet.odds)}
+            {formatOdds(Number(bet.odds))}
           </div>
         </div>
 
@@ -167,84 +178,50 @@ function BetCard({
         </div>
       ) : null}
 
+      {bet.polymarket_winning_outcome ? (
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-600">
+            Polymarket Result
+          </div>
+          <div className="mt-1 text-sm font-semibold text-zinc-100">
+            {bet.polymarket_winning_outcome}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="text-[12px] text-zinc-500">
           {active ? "Placed" : "Settled"}{" "}
           {formatDate(active ? bet.placed_at : bet.settled_at)}
         </div>
+
+        {active && bet.polymarket_synced_at ? (
+          <div className="text-[12px] text-zinc-600">
+            Synced {formatDate(bet.polymarket_synced_at)}
+          </div>
+        ) : null}
       </div>
 
-      {active && onSettle ? (
+      {active && bet.polymarket_resolution_error ? (
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3 text-[12px] text-zinc-500">
+          {bet.polymarket_resolution_error}
+        </div>
+      ) : null}
+
+      {active && onSyncPolymarket ? (
         <div className="mt-5 border-t border-zinc-800 pt-4">
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => onSettle(bet.id, "won")}
-              disabled={isSettling}
-              className="rounded-xl border border-zinc-700 px-3 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Won
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSettle(bet.id, "lost")}
-              disabled={isSettling}
-              className="rounded-xl border border-zinc-700 px-3 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Lost
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSettle(bet.id, "void")}
-              disabled={isSettling}
-              className="rounded-xl border border-zinc-700 px-3 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Void
-            </button>
-          </div>
-
-          <div className="mt-3">
-            {!cashoutOpen ? (
-              <button
-                type="button"
-                onClick={() => setCashoutOpen(true)}
-                disabled={isSettling}
-                className="w-full rounded-xl border border-zinc-800 px-3 py-2 text-[12px] font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cashout
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <div className="flex h-10 min-w-0 flex-1 items-center rounded-xl border border-zinc-800 bg-black/30 px-3">
-                  <span className="text-sm text-zinc-500">$</span>
-                  <input
-                    value={cashoutAmount}
-                    onChange={(event) =>
-                      setCashoutAmount(
-                        event.target.value.replace(/[^0-9.]/g, "")
-                      )
-                    }
-                    placeholder="0.00"
-                    inputMode="decimal"
-                    className="h-full min-w-0 flex-1 bg-transparent px-2 text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSettle(bet.id, "cashed_out", Number(cashoutAmount))
-                  }
-                  disabled={isSettling || !Number(cashoutAmount)}
-                  className="rounded-xl bg-zinc-100 px-3 py-2 text-[12px] font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Save
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => onSyncPolymarket(bet.id)}
+            disabled={isSyncing || !hasPolymarketData}
+            className="w-full rounded-xl border border-zinc-700 px-3 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSyncing
+              ? "Syncing..."
+              : hasPolymarketData
+                ? "Sync Result"
+                : "Missing Polymarket Data"}
+          </button>
         </div>
       ) : null}
     </div>
@@ -257,26 +234,23 @@ export default function PortfolioClient() {
   const [openBets, setOpenBets] = useState<Bet[]>([]);
   const [pastBets, setPastBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [settlingBetId, setSettlingBetId] = useState<string | null>(null);
+  const [syncingBetId, setSyncingBetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const totals = useMemo(() => {
-    const activeRisk = openBets.reduce((sum, bet) => sum + Number(bet.stake), 0);
+    const activeRisk = openBets.reduce(
+      (sum, bet) => sum + Number(bet.stake ?? 0),
+      0
+    );
 
     const possiblePayout = openBets.reduce(
-      (sum, bet) => sum + Number(bet.potential_payout),
+      (sum, bet) => sum + Number(bet.potential_payout ?? 0),
       0
     );
 
     const realizedPnl = pastBets.reduce((sum, bet) => {
-      if (bet.status === "won") return sum + Number(bet.potential_profit);
-      if (bet.status === "lost") return sum - Number(bet.stake);
-      if (bet.status === "void") return sum;
-      if (bet.status === "cashed_out") {
-        return sum + (Number(bet.settlement_amount ?? 0) - Number(bet.stake));
-      }
-
-      return sum;
+      const pnl = getBetPnl(bet);
+      return sum + Number(pnl ?? 0);
     }, 0);
 
     return {
@@ -288,7 +262,7 @@ export default function PortfolioClient() {
     };
   }, [openBets, pastBets]);
 
-  async function loadPortfolio() {
+  async function loadPortfolio(options?: { silent?: boolean }) {
     if (!ready) return;
 
     if (!authenticated) {
@@ -299,17 +273,22 @@ export default function PortfolioClient() {
     }
 
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+      }
+
       setError(null);
 
       const accessToken = await getAccessToken();
 
+      if (!accessToken) {
+        throw new Error("Missing auth token.");
+      }
+
       const response = await fetch("/api/portfolio/mine", {
-        headers: accessToken
-          ? {
-              Authorization: `Bearer ${accessToken}`,
-            }
-          : {},
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
       const data = await response.json();
@@ -324,50 +303,60 @@ export default function PortfolioClient() {
       console.error(err);
       setError(err instanceof Error ? err.message : "Unable to load portfolio.");
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }
 
-  async function settleBet(
-    betId: string,
-    result: SettleResult,
-    cashoutAmount?: number
-  ) {
+  async function syncPolymarketBet(betId: string) {
+    if (syncingBetId) return;
+
     try {
-      setSettlingBetId(betId);
+      setSyncingBetId(betId);
       setError(null);
 
       const accessToken = await getAccessToken();
 
-      const response = await fetch("/api/bets/settle", {
+      if (!accessToken) {
+        throw new Error("Missing auth token.");
+      }
+
+      const response = await fetch("/api/bets/sync-polymarket", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(accessToken
-            ? {
-                Authorization: `Bearer ${accessToken}`,
-              }
-            : {}),
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          betId,
-          result,
-          cashoutAmount: result === "cashed_out" ? cashoutAmount : null,
-        }),
+        body: JSON.stringify({ betId }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Unable to settle bet.");
+        if (response.status === 409) {
+          // Normal state: market exists, but Polymarket has not resolved it yet.
+          setError(data?.reason || "Market has not resolved on Polymarket yet.");
+
+          // Silent refresh keeps the current UI mounted instead of showing
+          // the full-page "Loading portfolio..." card again.
+          await loadPortfolio({ silent: true });
+          return;
+        }
+
+        throw new Error(data?.error || "Unable to sync Polymarket result.");
       }
 
-      await loadPortfolio();
+      await loadPortfolio({ silent: true });
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Unable to settle bet.");
+      setError(
+        err instanceof Error ? err.message : "Unable to sync Polymarket result."
+      );
+
+      await loadPortfolio({ silent: true });
     } finally {
-      setSettlingBetId(null);
+      setSyncingBetId(null);
     }
   }
 
@@ -377,11 +366,12 @@ export default function PortfolioClient() {
   }, [ready, authenticated]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-6 md:py-10">
+    <div className="mx-auto w-full max-w-7xl px-5 py-8 pb-24 sm:px-6 md:py-10">
       <div className="mb-8">
         <h1 className="text-[34px] font-semibold tracking-tight text-zinc-100">
           Portfolio
         </h1>
+
         <p className="mt-2 text-sm text-zinc-500">
           View active and past positions across your accounts.
         </p>
@@ -396,6 +386,7 @@ export default function PortfolioClient() {
           <h2 className="text-xl font-semibold text-zinc-100">
             Sign in to view your portfolio
           </h2>
+
           <button
             type="button"
             onClick={login}
@@ -451,9 +442,15 @@ export default function PortfolioClient() {
           </div>
 
           <section>
-            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-zinc-100">
-              Active Positions
-            </h2>
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
+                Active Positions
+              </h2>
+
+              <div className="text-sm text-zinc-500">
+                Possible payout: {formatMoney(totals.possiblePayout)}
+              </div>
+            </div>
 
             {openBets.length ? (
               <div className="grid gap-4 lg:grid-cols-2">
@@ -462,8 +459,8 @@ export default function PortfolioClient() {
                     key={bet.id}
                     bet={bet}
                     active
-                    onSettle={settleBet}
-                    isSettling={settlingBetId === bet.id}
+                    onSyncPolymarket={syncPolymarketBet}
+                    isSyncing={syncingBetId === bet.id}
                   />
                 ))}
               </div>

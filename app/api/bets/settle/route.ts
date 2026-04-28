@@ -3,11 +3,15 @@ import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { privyServer } from "@/lib/privy-server";
 
+type SettleResult = "won" | "lost" | "void" | "cashed_out";
+
 type SettleBetBody = {
   betId?: string;
-  result?: "won" | "lost" | "void" | "cashed_out";
+  result?: SettleResult;
   cashoutAmount?: number | null;
 };
+
+const VALID_RESULTS: SettleResult[] = ["won", "lost", "void", "cashed_out"];
 
 export async function POST(req: Request) {
   try {
@@ -36,11 +40,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing bet ID." }, { status: 400 });
     }
 
-    if (
-      !body.result ||
-      !["won", "lost", "void", "cashed_out"].includes(body.result)
-    ) {
+    if (!body.result || !VALID_RESULTS.includes(body.result)) {
       return NextResponse.json({ error: "Invalid result." }, { status: 400 });
+    }
+
+    if (body.result === "cashed_out") {
+      if (
+        typeof body.cashoutAmount !== "number" ||
+        Number.isNaN(body.cashoutAmount) ||
+        body.cashoutAmount < 0
+      ) {
+        return NextResponse.json(
+          { error: "Invalid cashout amount." },
+          { status: 400 }
+        );
+      }
     }
 
     const { data: dbUser, error: userError } = await supabaseAdmin
@@ -61,20 +75,22 @@ export async function POST(req: Request) {
         p_user_id: dbUser.id,
         p_bet_id: body.betId,
         p_result: body.result,
-        p_cashout_amount: body.cashoutAmount ?? null,
+        p_cashout_amount:
+          body.result === "cashed_out" ? body.cashoutAmount : null,
       }
     );
 
-    if (settleError) {
-      throw settleError;
-    }
+    if (settleError) throw settleError;
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Settle bet error:", error);
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to settle bet." },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to settle bet.",
+      },
       { status: 500 }
     );
   }

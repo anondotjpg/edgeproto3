@@ -11,7 +11,33 @@ type PlaceBetBody = {
   selection?: string;
   odds?: number;
   stake?: number;
+
+  polymarketEventId?: string | null;
+  polymarketEventSlug?: string | null;
+  polymarketMarketId?: string | null;
+  polymarketConditionId?: string | null;
+  polymarketMarketSlug?: string | null;
+  polymarketOutcome?: string | null;
+  polymarketOutcomeIndex?: number | null;
+  polymarketTokenId?: string | null;
 };
+
+function cleanText(value: unknown) {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function cleanInteger(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed)) return null;
+
+  return parsed;
+}
 
 export async function POST(req: Request) {
   try {
@@ -37,12 +63,21 @@ export async function POST(req: Request) {
     const body = (await req.json()) as PlaceBetBody;
 
     const accountIds = body.accountIds ?? [];
-    const gameId = body.gameId;
-    const league = body.league;
-    const market = body.market;
-    const selection = body.selection;
+    const gameId = cleanText(body.gameId);
+    const league = cleanText(body.league);
+    const market = cleanText(body.market);
+    const selection = cleanText(body.selection);
     const odds = Number(body.odds);
     const stake = Number(body.stake);
+
+    const polymarketEventId = cleanText(body.polymarketEventId);
+    const polymarketEventSlug = cleanText(body.polymarketEventSlug);
+    const polymarketMarketId = cleanText(body.polymarketMarketId);
+    const polymarketConditionId = cleanText(body.polymarketConditionId);
+    const polymarketMarketSlug = cleanText(body.polymarketMarketSlug);
+    const polymarketOutcome = cleanText(body.polymarketOutcome);
+    const polymarketOutcomeIndex = cleanInteger(body.polymarketOutcomeIndex);
+    const polymarketTokenId = cleanText(body.polymarketTokenId);
 
     if (!accountIds.length) {
       return NextResponse.json(
@@ -66,6 +101,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid stake." }, { status: 400 });
     }
 
+    /**
+     * For Polymarket-backed bets, these two fields are what make
+     * automated settlement reliable:
+     *
+     * polymarketConditionId = find the market
+     * polymarketTokenId = identify the user's selected outcome
+     *
+     * I am not hard-requiring them here because you may still want
+     * non-Polymarket/manual/dev bets. The Portfolio button will show
+     * "Missing Polymarket Data" if these are absent.
+     */
+    const hasSomePolymarketData =
+      Boolean(polymarketEventId) ||
+      Boolean(polymarketEventSlug) ||
+      Boolean(polymarketMarketId) ||
+      Boolean(polymarketConditionId) ||
+      Boolean(polymarketMarketSlug) ||
+      Boolean(polymarketOutcome) ||
+      polymarketOutcomeIndex !== null ||
+      Boolean(polymarketTokenId);
+
+    if (hasSomePolymarketData && (!polymarketConditionId || !polymarketTokenId)) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing Polymarket settlement data. Need condition ID and token ID.",
+        },
+        { status: 400 }
+      );
+    }
+
     const { data: dbUser, error: userError } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -81,17 +147,35 @@ export async function POST(req: Request) {
     const placedBetIds: string[] = [];
 
     for (const accountId of accountIds) {
+      const cleanAccountId = cleanText(accountId);
+
+      if (!cleanAccountId) {
+        return NextResponse.json(
+          { error: "Invalid account ID." },
+          { status: 400 }
+        );
+      }
+
       const { data: betId, error: rpcError } = await supabaseAdmin.rpc(
         "place_bet_for_account",
         {
           p_user_id: dbUser.id,
-          p_account_id: accountId,
+          p_account_id: cleanAccountId,
           p_game_id: gameId,
           p_league: league,
           p_market: market,
           p_selection: selection,
           p_odds: odds,
           p_stake: stake,
+
+          p_polymarket_event_id: polymarketEventId,
+          p_polymarket_event_slug: polymarketEventSlug,
+          p_polymarket_market_id: polymarketMarketId,
+          p_polymarket_condition_id: polymarketConditionId,
+          p_polymarket_market_slug: polymarketMarketSlug,
+          p_polymarket_outcome: polymarketOutcome,
+          p_polymarket_outcome_index: polymarketOutcomeIndex,
+          p_polymarket_token_id: polymarketTokenId,
         }
       );
 
@@ -110,7 +194,10 @@ export async function POST(req: Request) {
     console.error("Place bet error:", error);
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to place bet." },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to place bet.",
+      },
       { status: 500 }
     );
   }

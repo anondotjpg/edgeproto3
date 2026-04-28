@@ -20,6 +20,15 @@ type BetSlipModalProps = {
   odds: string;
   impliedPercent: string;
   matchup: string;
+
+  polymarketEventId?: string | null;
+  polymarketEventSlug?: string | null;
+  polymarketMarketId?: string | null;
+  polymarketConditionId?: string | null;
+  polymarketMarketSlug?: string | null;
+  polymarketOutcome?: string | null;
+  polymarketOutcomeIndex?: number | null;
+  polymarketTokenId?: string | null;
 };
 
 function parseAmount(value: string) {
@@ -45,6 +54,15 @@ export default function BetSlipModal({
   odds,
   impliedPercent,
   matchup,
+
+  polymarketEventId,
+  polymarketEventSlug,
+  polymarketMarketId,
+  polymarketConditionId,
+  polymarketMarketSlug,
+  polymarketOutcome,
+  polymarketOutcomeIndex,
+  polymarketTokenId,
 }: BetSlipModalProps) {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
 
@@ -109,7 +127,9 @@ export default function BetSlipModal({
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load accounts.");
+          setError(
+            err instanceof Error ? err.message : "Failed to load accounts."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -155,6 +175,12 @@ export default function BetSlipModal({
         throw new Error("Enter a valid bet amount.");
       }
 
+      if (!polymarketConditionId || !polymarketTokenId) {
+        throw new Error(
+          "Missing Polymarket settlement data. Refresh and try again."
+        );
+      }
+
       const accessToken = await getAccessToken();
 
       const response = await fetch("/api/bets/place", {
@@ -175,6 +201,15 @@ export default function BetSlipModal({
           selection: team,
           odds: numericOdds,
           stake,
+
+          polymarketEventId,
+          polymarketEventSlug,
+          polymarketMarketId,
+          polymarketConditionId,
+          polymarketMarketSlug,
+          polymarketOutcome: polymarketOutcome ?? team,
+          polymarketOutcomeIndex,
+          polymarketTokenId,
         }),
       });
 
@@ -330,7 +365,9 @@ export default function BetSlipModal({
                 <span className="text-zinc-500">$</span>
                 <input
                   value={amount}
-                  onChange={(event) => setAmount(parseAmount(event.target.value))}
+                  onChange={(event) =>
+                    setAmount(parseAmount(event.target.value))
+                  }
                   placeholder="0.00"
                   inputMode="decimal"
                   className="h-full min-w-0 flex-1 bg-transparent px-2 text-lg font-semibold text-white outline-none placeholder:text-zinc-600"

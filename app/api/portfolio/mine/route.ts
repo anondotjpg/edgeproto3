@@ -30,60 +30,79 @@ export async function GET() {
       .eq("privy_user_id", privyUserId)
       .maybeSingle();
 
-    if (userError) {
-      throw userError;
-    }
+    if (userError) throw userError;
 
     if (!dbUser) {
-      return NextResponse.json({
-        openBets: [],
-        pastBets: [],
-      });
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
-    const { data: bets, error: betsError } = await supabaseAdmin
-      .from("bets")
-      .select(
-        `
-        id,
-        account_id,
-        game_id,
-        league,
-        market,
-        selection,
-        odds,
-        stake,
-        potential_profit,
-        potential_payout,
-        status,
-        result,
-        settlement_amount,
-        placed_at,
-        settled_at,
-        challenge_accounts (
-          plan_key,
-          plan_size
-        )
-      `
+    const selectFields = `
+      id,
+      account_id,
+      game_id,
+      league,
+      market,
+      selection,
+      odds,
+      stake,
+      potential_profit,
+      potential_payout,
+      status,
+      result,
+      settlement_amount,
+      placed_at,
+      settled_at,
+
+      polymarket_event_id,
+      polymarket_event_slug,
+      polymarket_market_id,
+      polymarket_condition_id,
+      polymarket_market_slug,
+      polymarket_outcome,
+      polymarket_outcome_index,
+      polymarket_token_id,
+      polymarket_synced_at,
+      polymarket_resolution_source,
+      polymarket_winning_token_id,
+      polymarket_winning_outcome,
+      polymarket_resolution_error,
+
+      challenge_accounts (
+        plan_key,
+        plan_size
       )
+    `;
+
+    const { data: openBets, error: openError } = await supabaseAdmin
+      .from("bets")
+      .select(selectFields)
       .eq("user_id", dbUser.id)
+      .eq("status", "open")
       .order("placed_at", { ascending: false });
 
-    if (betsError) {
-      throw betsError;
-    }
+    if (openError) throw openError;
 
-    const allBets = bets ?? [];
+    const { data: pastBets, error: pastError } = await supabaseAdmin
+      .from("bets")
+      .select(selectFields)
+      .eq("user_id", dbUser.id)
+      .in("status", ["won", "lost", "void", "cashed_out"])
+      .order("settled_at", { ascending: false });
+
+    if (pastError) throw pastError;
 
     return NextResponse.json({
-      openBets: allBets.filter((bet) => bet.status === "open"),
-      pastBets: allBets.filter((bet) => bet.status !== "open"),
+      openBets: openBets ?? [],
+      pastBets: pastBets ?? [],
     });
   } catch (error) {
-    console.error("Portfolio load error:", error);
+    console.error("Load portfolio error:", error);
 
     return NextResponse.json(
-      { error: "Unable to load portfolio." },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to load portfolio.",
+      },
       { status: 500 }
     );
   }

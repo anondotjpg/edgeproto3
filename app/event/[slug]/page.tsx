@@ -43,6 +43,22 @@ type Game = {
   home_team_info?: TeamInfo;
   away_team_info?: TeamInfo;
   bookmakers: Bookmaker[];
+
+  polymarket?: {
+    event_id: string;
+    event_slug: string | null;
+    market_id: string;
+    market_slug: string | null;
+    condition_id: string | null;
+    question: string | null;
+    outcomes: string[];
+    clob_token_ids: string[];
+  };
+
+  outcome_token_ids?: {
+    away?: string;
+    home?: string;
+  };
 };
 
 type EventResponse = {
@@ -142,15 +158,22 @@ function TeamPanel({
   sportKey,
   price,
   game,
+  side,
 }: {
   team: string;
   info?: TeamInfo;
   sportKey: string;
   price?: number;
   game: Game;
+  side: "away" | "home";
 }) {
   const impliedPercent = formatImpliedPercent(price);
   const americanOdds = formatPrice(price);
+
+  const polymarketTokenId =
+    side === "away"
+      ? game.outcome_token_ids?.away
+      : game.outcome_token_ids?.home;
 
   return (
     <div className="min-w-0 rounded-[28px] border border-zinc-800 bg-zinc-950 p-5">
@@ -195,6 +218,14 @@ function TeamPanel({
             odds={americanOdds}
             impliedPercent={impliedPercent}
             matchup={`${game.away_team} vs. ${game.home_team}`}
+            polymarketEventId={game.polymarket?.event_id ?? null}
+            polymarketEventSlug={game.polymarket?.event_slug ?? null}
+            polymarketMarketId={game.polymarket?.market_id ?? null}
+            polymarketConditionId={game.polymarket?.condition_id ?? null}
+            polymarketMarketSlug={game.polymarket?.market_slug ?? null}
+            polymarketOutcome={team}
+            polymarketOutcomeIndex={side === "away" ? 0 : 1}
+            polymarketTokenId={polymarketTokenId ?? null}
           />
         </div>
       </div>
@@ -274,6 +305,7 @@ export default async function EventPage({ params }: EventPageProps) {
               sportKey={game.sport_key}
               price={awayMoneyline?.price}
               game={game}
+              side="away"
             />
 
             <TeamPanel
@@ -282,6 +314,7 @@ export default async function EventPage({ params }: EventPageProps) {
               sportKey={game.sport_key}
               price={homeMoneyline?.price}
               game={game}
+              side="home"
             />
           </div>
 
